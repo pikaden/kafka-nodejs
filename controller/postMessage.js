@@ -1,16 +1,20 @@
 import { produce } from "../kafka-connection/kafka-connect.js";
+import { ItemSource } from "../models/Items.js";
 
-// ES modules
-export async function sendMessageToKafka(req, res) {
+export async function addItem(req, res) {
   try {
-    const { message } = req.body;
-    const messages = [{ key: "key1", value: message }];
-    produce("my-topic", messages);
+    const items = new ItemSource({
+      name: req.body.name,
+      quantity: req.body.quantity,
+    });
+
+    await items.save();
+    produce("my-items", items)
 
     res.status(200).json({
-      status: "Ok!",
-      message: "Message successfully send!",
-    });
+      status: "OK!",
+      message: "Item added succesfully!"
+    })
   } catch (error) {
     console.log(error);
   }

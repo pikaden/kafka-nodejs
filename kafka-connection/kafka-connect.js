@@ -1,6 +1,7 @@
 import { Kafka } from "kafkajs";
+import { ItemSink } from "../models/Items.js";
 
-const CLIENT_ID = "nodejs-kafka"
+const CLIENT_ID = "nodejs-kafka";
 const BROKERS = ["localhost:9092", "localhost:9093"];
 
 const kafka = new Kafka({
@@ -8,15 +9,22 @@ const kafka = new Kafka({
   brokers: BROKERS,
 });
 
-export async function produce(topic, messages) {
+export async function produce(topic, items) {
   const producer = kafka.producer();
 
   try {
     await producer.connect();
-    await producer.send({
+    const responses = await producer.send({
       topic: topic,
-      messages: messages,
+      messages: [
+        {
+          key: items.id,
+          value: JSON.stringify(items),
+        },
+      ],
     });
+
+    console.log("Published message", { responses });
   } catch (error) {
     console.error(error);
   } finally {
@@ -24,15 +32,22 @@ export async function produce(topic, messages) {
   }
 }
 
-export async function consume(topic, callback) {
-  const consumer = kafka.consumer({ groupId: "test-group" });
+export async function consume(topic, groupId, callback) {
+  const consumer = kafka.consumer({ groupId: groupId });
 
   try {
     await consumer.connect();
     await consumer.subscribe({ topic: topic, fromBeginning: true });
     await consumer.run({
       eachMessage: async ({ topic, partition, message }) => {
-        const value = message.value.toString();
+        const value = JSON.parse(message.value)
+
+        const items = new ItemSink({
+          name: value.name,
+          quantity: value.quantity,
+        });
+
+        await items.save();
         callback(value);
       },
     });
